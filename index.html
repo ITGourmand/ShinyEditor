@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShinyEditor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/ico" href="/dna.ico">
+    <script src="https://unpkg.com/webm-muxer/build/webm-muxer.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-200 h-screen flex flex-col overflow-hidden font-sans">
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <aside class="w-full md:w-80 max-h-[45vh] md:max-h-none bg-slate-800 border-b md:border-b-0 md:border-r border-slate-700 flex flex-col shrink-0 z-30 shadow-xl">
+            <div class="p-5 flex flex-col gap-5 overflow-y-auto custom-scrollbar flex-1">
+                <div id="dropZone" class="border-2 border-dashed border-slate-600 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-slate-700/50 transition-all">
+                    <i class="fa-solid fa-cloud-upload text-2xl opacity-30 mb-2"></i>
+                    <p class="text-sm text-slate-400">Drag or click to load the image</p>
+                    <input type="file" id="imageUpload" accept="image/*" class="hidden" multiple>
+                    <input type="file" id="folderUpload" webkitdirectory directory multiple class="hidden">
+                </div>
+
+                <div id="navControls" class="hidden flex items-center justify-between bg-slate-700/30 p-2 rounded-lg mb-4">
+                    <button id="prevBtn" class="p-2 hover:bg-slate-600 rounded transition"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="imageCounter" class="text-xs font-mono opacity-70">0 / 0</span>
+                    <button id="nextBtn" class="p-2 hover:bg-slate-600 rounded transition"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="pipetteBtn" disabled class="flex-1 py-3 bg-slate-700 rounded-lg hover:bg-slate-600 transition disabled:opacity-30 active:scale-95" title="Pipette">
+                        <i class="fa-solid fa-eye-dropper"></i>
+                    </button>
+                    <div class="flex-1 flex gap-1">
+                        <button id="downloadPngBtn" disabled class="flex-1 py-3 bg-blue-600 rounded-l-lg hover:bg-blue-500 transition disabled:opacity-30 active:scale-95" title="Exporter en PNG">
+                            <i class="fa-solid fa-image"></i>
+                        </button>
+                        <button id="downloadVideoBtn" disabled class="flex-1 py-3 bg-indigo-600 rounded-r-lg hover:bg-indigo-500 transition disabled:opacity-30 active:scale-95" title="Exporter Vidéo Avant/Après">
+                            <i class="fa-solid fa-video"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-700 pt-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs uppercase tracking-widest opacity-60 font-bold">Remap Rules</span>
+                        <div class="flex gap-2">
+                            <button id="filterRulesBtn" class="bg-slate-700 text-slate-400 hover:bg-slate-600 w-7 h-7 rounded-full transition flex items-center justify-center" title="Hide identity rules">
+                                <i class="fa-solid fa-filter text-xs"></i>
+                            </button>
+                            <button id="addRuleBtn" class="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 w-7 h-7 rounded-full transition flex items-center justify-center">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="rulesContainer" class="flex flex-col gap-2.5 min-h-[200px]"></div>
+                </div>
+            </div>
+            <div id="timer" class="text-[10px] opacity-30 text-center py-2 border-t border-slate-700 bg-slate-800/50"></div>
+        </aside>
+
+        <section id="workspace" class="flex-1 flex flex-col bg-slate-950 relative md:overflow-hidden overflow-y-auto custom-scrollbar">
+
+            <div id="viewport" class="flex-none md:flex-1 flex flex-col md:flex-row p-2 gap-2 z-10">
+                
+                <div class="flex-1 min-h-[300px] md:min-h-0 flex items-center justify-center relative bg-slate-900 rounded-lg border border-white/5 overflow-hidden">
+                    <div id="originalContainer" class="checkerboard canvas-container">
+                        <canvas id="originalCanvas"></canvas>
+                    </div>
+                </div>
+        
+                <div class="flex-1 min-h-[300px] md:min-h-0 flex items-center justify-center relative bg-slate-900 rounded-lg border border-white/5 overflow-hidden">
+                    <div id="resultContainer" class="checkerboard canvas-container">
+                        <canvas id="resultCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        
+            <div class="w-full max-w-[288px] mx-auto p-4 group ref-zone relative md:absolute md:top-5 md:left-1/2 md:-translate-x-1/2 md:z-20 md:pointer-events-none">
+                <div class="relative w-full h-[200px] md:h-[288px] bg-slate-800/80 rounded-2xl border border-slate-600 overflow-hidden backdrop-blur-md shadow-2xl pointer-events-auto">
+                    
+                    <label class="absolute top-2 right-2 cursor-pointer z-30 bg-black/50 w-8 h-8 flex items-center justify-center rounded-full hover:bg-blue-600 transition">
+                        <i class="fa-solid fa-image text-white text-xs"></i>
+                        <input type="file" id="refUpload" accept="image/*" class="hidden">
+                    </label>
+                    
+                    <div id="refContainer" class="checkerboard canvas-container">
+                        <canvas id="refCanvas" class="shadow-2xl w-full h-full object-contain"></canvas>
+                        <i id="refPlaceholder" class="fa-solid fa-mountain opacity-10 text-5xl absolute"></i>
+                    </div>
+                </div>
+            </div>
+        
+        </section>
+    </main>
+
+    <div id="zoomHint" class="fixed bottom-4 right-4 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs shadow-xl z-50 pointer-events-none opacity-0 transition-opacity flex items-center gap-2">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>Scroll wheel: Zoom | Middle click or Space+Click: Pan</span>
+    </div>
+
+    <script src="gd_core.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
