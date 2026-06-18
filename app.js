@@ -73,55 +73,57 @@ class CanvasInteractor {
     }
 
     setupEvents() {
-
         let initialPinchDistance = null;
         let initialScale = null;
 
+        // Correction des événements tactiles (index [0] et [1] manquants)
         this.container.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
-
                 e.preventDefault();
                 initialPinchDistance = Math.hypot(
-                    e.touches.clientX - e.touches.clientX,
-                    e.touches.clientY - e.touches.clientY
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
                 );
                 initialScale = this.state.scale;
             } else if (e.touches.length === 1 && !app.state.isPipetteActive) {
-
                 this.state.panning = true;
-                this.state.startX = e.touches.clientX - this.state.pointX;
-                this.state.startY = e.touches.clientY - this.state.pointY;
+                const rect = this.container.getBoundingClientRect();
+                this.state.startX = (e.touches[0].clientX - rect.left) - this.state.pointX;
+                this.state.startY = (e.touches[0].clientY - rect.top) - this.state.pointY;
             }
         }, { passive: false });
 
         this.container.addEventListener('touchmove', (e) => {
             if (e.touches.length === 2 && initialPinchDistance) {
-
                 e.preventDefault();
                 const currentDistance = Math.hypot(
-                    e.touches.clientX - e.touches.clientX,
-                    e.touches.clientY - e.touches.clientY
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
                 );
 
-                const centerX = (e.touches.clientX + e.touches.clientX) / 2;
-                const centerY = (e.touches.clientY + e.touches.clientY) / 2;
-                
-                const xs = (centerX - this.state.pointX) / this.state.scale;
-                const ys = (centerY - this.state.pointY) / this.state.scale;
+                const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+                const rect = this.container.getBoundingClientRect();
+                const mouseX = centerX - rect.left;
+                const mouseY = centerY - rect.top;
+
+                const xs = (mouseX - this.state.pointX) / this.state.scale;
+                const ys = (mouseY - this.state.pointY) / this.state.scale;
 
                 let newScale = initialScale * (currentDistance / initialPinchDistance);
-                newScale = Math.max(0.1, Math.min(newScale, 50)); 
+                newScale = Math.max(0.1, Math.min(newScale, 50));
 
-                this.state.pointX = centerX - xs * newScale;
-                this.state.pointY = centerY - ys * newScale;
+                this.state.pointX = mouseX - xs * newScale;
+                this.state.pointY = mouseY - ys * newScale;
                 this.state.scale = newScale;
 
                 this.updateTransform();
             } else if (this.state.panning && e.touches.length === 1) {
-
                 e.preventDefault();
-                this.state.pointX = e.touches.clientX - this.state.startX;
-                this.state.pointY = e.touches.clientY - this.state.startY;
+                const rect = this.container.getBoundingClientRect();
+                this.state.pointX = (e.touches[0].clientX - rect.left) - this.state.startX;
+                this.state.pointY = (e.touches[0].clientY - rect.top) - this.state.startY;
                 this.updateTransform();
             }
         }, { passive: false });
@@ -131,39 +133,44 @@ class CanvasInteractor {
             this.state.panning = false;
         });
 
+        // CORRIGÉ : Utilisation de coordonnées strictement relatives au conteneur pour le Zoom
         this.container.addEventListener('wheel', (e) => {
             e.preventDefault();
-            
-            const xs = (e.clientX - this.state.pointX) / this.state.scale;
-            const ys = (e.clientY - this.state.pointY) / this.state.scale;
+
+            const rect = this.container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const xs = (mouseX - this.state.pointX) / this.state.scale;
+            const ys = (mouseY - this.state.pointY) / this.state.scale;
 
             const delta = -e.deltaY;
-
             const factor = delta > 0 ? 1.1 : 0.9;
-            
+
             let newScale = this.state.scale * factor;
+            newScale = Math.max(0.1, Math.min(newScale, 50));
 
-            newScale = Math.max(0.1, Math.min(newScale, 50)); 
-
-            this.state.pointX = e.clientX - xs * newScale;
-            this.state.pointY = e.clientY - ys * newScale;
+            this.state.pointX = mouseX - xs * newScale;
+            this.state.pointY = mouseY - ys * newScale;
             this.state.scale = newScale;
 
             this.updateTransform();
         }, { passive: false });
 
+        // CORRIGÉ : Calculs du Pan (déplacement) basés sur le conteneur
         const startPan = (e) => {
-
             const isMiddleClick = e.button === 1;
             const isSpacePan = e.button === 0 && window.isSpacePressed;
 
             if (isMiddleClick || isSpacePan) {
                 e.preventDefault();
                 this.state.panning = true;
-                this.state.startX = e.clientX - this.state.pointX;
-                this.state.startY = e.clientY - this.state.pointY;
-                this.container.classList.add('grabbing');
 
+                const rect = this.container.getBoundingClientRect();
+                this.state.startX = (e.clientX - rect.left) - this.state.pointX;
+                this.state.startY = (e.clientY - rect.top) - this.state.pointY;
+
+                this.container.classList.add('grabbing');
                 this.container.setPointerCapture(e.pointerId);
             }
         };
@@ -179,8 +186,11 @@ class CanvasInteractor {
         const movePan = (e) => {
             if (!this.state.panning) return;
             e.preventDefault();
-            this.state.pointX = e.clientX - this.state.startX;
-            this.state.pointY = e.clientY - this.state.startY;
+
+            const rect = this.container.getBoundingClientRect();
+            this.state.pointX = (e.clientX - rect.left) - this.state.startX;
+            this.state.pointY = (e.clientY - rect.top) - this.state.startY;
+
             this.updateTransform();
         };
 
@@ -293,11 +303,33 @@ const app = {
         this.ui.prevBtn.onclick = () => this.navigate(-1);
         this.ui.nextBtn.onclick = () => this.navigate(1);
 
+        this.ui.pipettePreview = document.createElement('canvas');
+        this.ui.pipettePreview.width = 121;  // Grille de 11x11 pixels zoomés (11 * 11 = 121)
+        this.ui.pipettePreview.height = 121;
+        Object.assign(this.ui.pipettePreview.style, {
+            position: 'fixed',
+            width: '121px',
+            height: '121px',
+            borderRadius: '50%', // Rendre le canvas parfaitement rond
+            border: '3px solid white',
+            boxShadow: '0 0 10px rgba(0,0,0,0.5)',
+            pointerEvents: 'none', // Empêche de bloquer le clic
+            display: 'none',
+            zIndex: '9999',
+            backgroundColor: '#111' // Couleur de fond si on dépasse du bord de l'image
+        });
+        document.body.appendChild(this.ui.pipettePreview);
+
+        this.ui.prevBtn.onclick = () => this.navigate(-1);
+
         window.addEventListener('keydown', (e) => {
             if (document.activeElement.tagName === 'INPUT') return;
             
             if (e.key === 'ArrowLeft') this.navigate(-1);
             if (e.key === 'ArrowRight') this.navigate(1);
+            if (e.key === 'Escape' && this.state.isPipetteActive) {
+                this.oldTogglePipette();
+            }
         });
 
         this.ui.dropZone.onclick = () => this.ui.uploadInput.click();
@@ -377,6 +409,70 @@ const app = {
                 this.interactors.original.fitToContainer();
                 this.interactors.result.fitToContainer();
             }
+        });
+
+        this.ui.originalContainer.addEventListener('pointermove', (e) => {
+            if (!this.state.isPipetteActive || window.isSpacePressed) {
+                if (this.ui.pipettePreview) this.ui.pipettePreview.style.display = 'none';
+                return;
+            }
+
+            if (!this.originalImageData) return;
+
+            const rect = this.ui.originalCanvas.getBoundingClientRect();
+            const xOnCanvas = e.clientX - rect.left;
+            const yOnCanvas = e.clientY - rect.top;
+            const xPixel = Math.floor((xOnCanvas / rect.width) * this.ui.originalCanvas.width);
+            const yPixel = Math.floor((yOnCanvas / rect.height) * this.ui.originalCanvas.height);
+
+            if (xPixel >= 0 && xPixel < this.ui.originalCanvas.width &&
+                yPixel >= 0 && yPixel < this.ui.originalCanvas.height) {
+
+                const color = this.getCanvasColorAtCoords(e.clientX, e.clientY);
+                if (color) this.ui.pipetteBtn.style.color = color;
+
+                const loupeCtx = this.ui.pipettePreview.getContext('2d');
+                loupeCtx.clearRect(0, 0, 121, 121);
+
+                loupeCtx.imageSmoothingEnabled = false;
+                loupeCtx.mozImageSmoothingEnabled = false;
+                loupeCtx.webkitImageSmoothingEnabled = false;
+
+                const numPixels = 11;
+                const pixelSize = 11;
+
+                const srcX = xPixel - Math.floor(numPixels / 2);
+                const srcY = yPixel - Math.floor(numPixels / 2);
+
+                loupeCtx.drawImage(
+                    this.ui.originalCanvas,
+                    srcX, srcY, numPixels, numPixels,
+                    0, 0, 121, 121
+                );
+
+                // DESSIN DU CARRÉ BLANC CENTRAL (Cible du pixel pointé)
+                loupeCtx.save();
+                loupeCtx.strokeStyle = '#ffffff';
+                loupeCtx.lineWidth = 1.5;
+                // Ombre sous le carré pour qu'il reste visible même sur fond blanc
+                loupeCtx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                loupeCtx.shadowBlur = 2;
+
+                const centerOffset = Math.floor(numPixels / 2) * pixelSize;
+                loupeCtx.strokeRect(centerOffset, centerOffset, pixelSize, pixelSize);
+                loupeCtx.restore();
+
+                // Positionner la loupe au-dessus et à droite du curseur de la souris
+                this.ui.pipettePreview.style.left = `${e.clientX + 20}px`;
+                this.ui.pipettePreview.style.top = `${e.clientY - 140}px`;
+                this.ui.pipettePreview.style.display = 'block';
+            } else {
+                this.ui.pipettePreview.style.display = 'none';
+            }
+        });
+
+        this.ui.originalContainer.addEventListener('pointerleave', () => {
+            if (this.ui.pipettePreview) this.ui.pipettePreview.style.display = 'none';
         });
     },
 
@@ -587,64 +683,64 @@ const app = {
     },
 
     async togglePipette() {
-
         if (!window.EyeDropper) {
-
-            this.oldTogglePipette(); 
+            this.oldTogglePipette();
             return;
         }
-    
+
         const eyeDropper = new EyeDropper();
         try {
             const result = await eyeDropper.open();
-            const roundedHex = this.roundColor(result.sRGBHex);
-            this.rules.push({ from: roundedHex, to: roundedHex });
+            const exactHex = result.sRGBHex.toUpperCase();
+            this.rules.push({ from: exactHex, to: exactHex });
             this.renderRules();
             this.triggerAutoUpdate();
         } catch (e) {
-
         }
     },
 
-    oldtogglePipette() {
+    oldTogglePipette() {
         this.state.isPipetteActive = !this.state.isPipetteActive;
         this.ui.pipetteBtn.classList.toggle('pipette-active', this.state.isPipetteActive);
         this.ui.originalContainer.classList.toggle('picking-mode', this.state.isPipetteActive);
+
+        if (!this.state.isPipetteActive) {
+            this.ui.pipetteBtn.style.color = '';
+            if (this.ui.pipettePreview) this.ui.pipettePreview.style.display = 'none';
+        }
+    },
+
+    getCanvasColorAtCoords(clientX, clientY) {
+        if (!this.originalImageData) return null;
+
+        const rect = this.ui.originalCanvas.getBoundingClientRect();
+
+        const xOnCanvas = clientX - rect.left;
+        const yOnCanvas = clientY - rect.top;
+
+        const xPixel = Math.floor((xOnCanvas / rect.width) * this.ui.originalCanvas.width);
+        const yPixel = Math.floor((yOnCanvas / rect.height) * this.ui.originalCanvas.height);
+
+        if (xPixel < 0 || xPixel >= this.ui.originalCanvas.width ||
+            yPixel < 0 || yPixel >= this.ui.originalCanvas.height) return null;
+
+        const p = this.ui.origCtx.getImageData(xPixel, yPixel, 1, 1).data;
+        const hex = "#" + ((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1).toUpperCase();
+
+        return this.roundColor(hex);
     },
 
     handlePipetteClick(e) {
+        if (!this.state.isPipetteActive || window.isSpacePressed) return;
 
-        if (!this.state.isPipetteActive || !this.originalImageData || window.isSpacePressed) return;
-        
-        const interactor = this.interactors.original;
-        const s = interactor.state;
+        const roundedHex = this.getCanvasColorAtCoords(e.clientX, e.clientY);
 
-
-        const rect = this.ui.originalContainer.getBoundingClientRect();
-        const mouseXContainer = e.clientX - rect.left;
-        const mouseYContainer = e.clientY - rect.top;
-
-
-        const xRelTransform = (mouseXContainer - s.pointX) / s.scale;
-        const yRelTransform = (mouseYContainer - s.pointY) / s.scale;
-
-        const xPixel = Math.floor(xRelTransform * (this.ui.originalCanvas.width / s.cssWidth));
-        const yPixel = Math.floor(yRelTransform * (this.ui.originalCanvas.height / s.cssHeight));
-
-        if (xPixel < 0 || xPixel >= this.ui.originalCanvas.width || 
-            yPixel < 0 || yPixel >= this.ui.originalCanvas.height) return;
-
-        const p = this.ui.origCtx.getImageData(xPixel, yPixel, 1, 1).data;
-
-        const hex = "#" + ((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1);
-        const roundedHex = this.roundColor(hex);
-
-        this.rules.push({ from: roundedHex, to: roundedHex });
-        this.renderRules();
-
-        this.togglePipette();
-
-        this.triggerAutoUpdate(); 
+        if (roundedHex) {
+            this.rules.push({ from: roundedHex, to: roundedHex });
+            this.renderRules();
+            this.oldTogglePipette();
+            this.triggerAutoUpdate();
+        }
     },
 
     roundColor(hex) {
