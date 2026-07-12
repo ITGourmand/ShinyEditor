@@ -133,7 +133,6 @@ class CanvasInteractor {
             this.state.panning = false;
         });
 
-        // CORRIGÉ : Utilisation de coordonnées strictement relatives au conteneur pour le Zoom
         this.container.addEventListener('wheel', (e) => {
             e.preventDefault();
 
@@ -589,7 +588,7 @@ const app = {
 
         let activeRules = this.state.showOnlyModified ? this.rules.filter(r => r.from !== r.to) : this.rules;
         const cppRules = activeRules.map(r => [this.hexToRgb(r.from), this.hexToRgb(r.to)]);
-        const filter = this.module.CreatePaletteRemap(cppRules);
+        const filter = this.module.CreatePaletteRemapFromArrayDef(cppRules);
 
         const framerate = 30;
         const durationPerImageSec = 1;
@@ -692,7 +691,8 @@ const app = {
         try {
             const result = await eyeDropper.open();
             const exactHex = result.sRGBHex.toUpperCase();
-            this.rules.push({ from: exactHex, to: exactHex });
+            const roundedHex = this.roundColor(exactHex);
+            this.rules.push({ from: roundedHex, to: roundedHex });
             this.renderRules();
             this.triggerAutoUpdate();
         } catch (e) {
@@ -851,7 +851,7 @@ const app = {
         let cppImage = new this.module.Image(width, height, new this.module.Pixel(0,0,0,0));
         cppImage.setData(data);
 
-        let filter = this.module.CreatePaletteRemap(cppRules);
+        let filter = this.module.CreatePaletteRemapFromArrayDef(cppRules);
         cppImage.applyFilter(filter);
 
         const out = cppImage.getPixelView();
